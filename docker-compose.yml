@@ -1,0 +1,8 @@
+version: "3.9"
+
+services:
+  arb-bot:
+    image: harryobas/arb-bot:latest
+    restart: always
+    env_file:
+      - .env
