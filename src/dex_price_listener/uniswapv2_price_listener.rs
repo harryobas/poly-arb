@@ -7,7 +7,7 @@ use futures::StreamExt;
 use std::sync::Arc;
 
 use crate::{
-    bindings::{SwapFilter, UniswapV2Pair},
+    bindings::uniswapv2::{SwapFilter, UniswapV2Pair},
     dex_price_listener::{DexPairConfig, DexPriceListener, PriceTracker},
     helpers::{compute_price, detect_token_ordering, get_token_symbol, to_f64_normalized},
 };

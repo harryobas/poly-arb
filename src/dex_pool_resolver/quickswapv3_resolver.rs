@@ -1,4 +1,4 @@
-use crate::bindings::AlgebraFactory;
+use crate::bindings::quickswapv3::AlgebraFactory;
 
 use super::{DexPoolResolver, Address, Middleware, Arc};
 

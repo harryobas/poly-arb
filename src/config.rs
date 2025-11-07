@@ -1,7 +1,7 @@
 use ethers::{providers::Middleware, types::{Address, U256}};
 use crate::{
     constants::*,
-    dex_pool_resolver::{uniswapv2_resolver::UniswapV2Resolver, uniswapv3_resolver::UniswapV3Resolver},
+    dex_pool_resolver::{quickswapv3_resolver::QuickSwapV3Resolver, uniswapv2_resolver::UniswapV2Resolver, uniswapv3_resolver::UniswapV3Resolver},
     helpers::make_pair,
     types::{DexConfig, DexPairConfig, DexType, Token},
 };
@@ -16,7 +16,7 @@ pub async fn build_target_configs<M: Middleware + 'static>(
     let quickswap_factory: Address = QUICKSWAP_FACTORY.parse()?;
     let sushiswapv2_factory: Address = SUSHISWAPV2_FACTORY.parse()?;
     let uniswapv3_factory: Address = UNISWAPV3_FACTORY.parse()?;
-    let sushiswapv3_factory: Address = SUSHISWAPV3_FACTORY.parse()?;
+    let quickswapv3_factory: Address = SUSHISWAPV3_FACTORY.parse()?;
 
     // --- Tokens ---
     let weth: Address = WETH.parse()?;
@@ -122,6 +122,27 @@ pub async fn build_target_configs<M: Middleware + 'static>(
     .filter_map(Result::ok)
     .collect::<Vec<DexPairConfig>>();
 
+
+    let quickv3_pairs = join_all(token_pairs.iter().map(|(base, quote)| {
+        let provider = provider.clone();
+        async move {
+            make_pair::<M, QuickSwapV3Resolver>(
+                quickswapv3_factory, 
+                base.clone(), 
+                quote.clone(), 
+                select_trade_size(quote.id), 
+                provider
+            )
+            .await
+        }
+    }))
+    .await
+    .into_iter()
+    .filter_map(Result::ok)
+    .collect::<Vec<DexPairConfig>>();
+
+
+
     // --- Assemble into DexConfig structs ---
     let configs = vec![
         DexConfig {
@@ -142,6 +163,13 @@ pub async fn build_target_configs<M: Middleware + 'static>(
             factory: uniswapv3_factory,
             pairs: uniswap_pairs,
             dex_type: DexType::V3
+        },
+
+        DexConfig {
+            name: String::from("quickswapv3"),
+            factory: quickswapv3_factory,
+            pairs: quickv3_pairs,
+            dex_type: DexType::QuickSwap
         }
     ];
 

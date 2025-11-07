@@ -1,5 +1,5 @@
 
-use crate::bindings::IUniswapV2Factory;
+use crate::bindings::uniswapv2::IUniswapV2Factory;
 use super::{DexPoolResolver, Middleware, Address, Arc};
   
 

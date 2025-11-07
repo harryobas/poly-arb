@@ -3,14 +3,14 @@ use ethers::{
     types::{Address, Bytes, H256 as TxHash, U256}
 };
 use crate::{
-    bindings::IERC20, 
+    bindings::erc20::IERC20, 
     constants::{FACTORY_ROUTER_MAP, TOKEN_SYMBOL_CACHE}, 
     dex_pool_resolver::DexPoolResolver,
     dex_price_listener::{
         DexPriceListener,
         uniswapv2_price_listener::UniswapV2Listener, 
         uniswapv3_price_listener::UniswapV3Listener,
-        balancer_price_listener::BalancerListener
+        quickswapv3_price_listener::QuickSwapV3Listener
      },
     types::{
         ArbOpportunity,
@@ -26,6 +26,11 @@ use crate::{
 
 use std::sync::Arc;
 use tokio::task::JoinHandle;
+
+use std::fs;
+use std::env;
+
+use num_traits::ToPrimitive;
 
 pub async fn make_pair<M, R>(
     factory: Address,
@@ -289,9 +294,9 @@ where
                         ).await;
                     })
                 }
-                DexType::Balancer => {
+                DexType::QuickSwap => {
                     tokio::spawn(async move {
-                        let _ = spawn_listener::<_, BalancerListener>(
+                        let _ = spawn_listener::<_, QuickSwapV3Listener>(
                             dex_clone, pair, provider, tracker
                         ).await;
                     })
@@ -315,10 +320,84 @@ pub async fn execute_arb_tx<M: Middleware + 'static>(
     arb_data: Bytes, 
     provider: Arc<M>
 ) -> anyhow::Result<TxHash>{
-    let executor = ArbExecutor::new(ARBITRAGE_CONTRACT, provider.clone());
-    let tx = executor.execute(arb_data).gas(8_000_000u64).send().await?;
-    let receipt = tx.await?.ok_or_else(|| anyhow::anyhow!("No receipt"))?;
-    Ok(receipt.transaction_hash)
+    todo!()
     
 }
+
+
+/// Load the bot's private key from Docker secret or environment variable
+pub fn load_private_key() -> String {
+    // Path where Docker secrets are mounted
+    let secret_path = "/run/secrets/private_key";
+
+    // Try to read from Docker secret file first
+    if let Ok(key) = fs::read_to_string(secret_path) {
+        println!("✅ Loaded PRIVATE_KEY from Docker secret.");
+        return key.trim().to_string();
+    }
+
+    // Fall back to environment variable
+    match env::var("PRIVATE_KEY") {
+        Ok(key) => {
+            println!("⚠️ Loaded PRIVATE_KEY from environment variable.");
+            key
+        }
+        Err(_) => panic!(
+            "❌ No private key found. Please set PRIVATE_KEY env var or provide /run/secrets/private_key."
+        ),
+    }
+}
+
+pub fn load_rpc_url() -> String {
+    match env::var("RPC_URL") {
+        Ok(key) => key,
+        Err(_) => panic!(
+            "No RPC URL found. Please set RPC_URL env var."
+        )
+    }
+}
+
+
+/// Converts sqrtPriceX96 to a normalized f64 quote/base price.
+///
+/// If token0 is the base asset (token0_is_base = true),
+/// returns price = token1/token0. Otherwise, returns token0/token1.
+pub fn sqrt_price_x96_to_price_f64(
+    sqrt_price_x96: U256,
+    token0_is_base: bool,
+    base_decimals: i32,
+    quote_decimals: i32,
+) -> anyhow::Result<f64> {
+    let q96 = U256::from(2).pow(U256::from(96));
+
+    let to_f64_lossy = |value: U256| -> f64 {
+        let mut bytes = [0u8; 32];
+        value.to_big_endian(&mut bytes);
+        let big = num_bigint::BigUint::from_bytes_be(&bytes);
+        big.to_f64().unwrap_or(f64::MAX)
+
+    };
+
+    // sqrt_price_x96 / Q96
+    let sqrt_price = to_f64_lossy(sqrt_price_x96) / to_f64_lossy(q96);
+
+    // price = (sqrt_price)^2
+    let mut price = sqrt_price * sqrt_price;
+
+    // Adjust decimal difference (base vs quote)
+    let scale = 10f64.powi(base_decimals - quote_decimals);
+    price *= scale;
+
+    // If token0 is not base, invert the price
+    if !token0_is_base {
+        price = 1.0 / price;
+    }
+
+    Ok(price)
+}
+
+
+
+
+
 

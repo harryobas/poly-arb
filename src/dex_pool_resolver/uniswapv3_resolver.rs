@@ -1,4 +1,4 @@
-use crate::bindings::IUniswapV3Factory;
+use crate::bindings::uniswapv3::IUniswapV3Factory;
 
 use super::{DexPoolResolver, Address, Middleware, Arc};
 

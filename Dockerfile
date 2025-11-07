@@ -24,7 +24,7 @@ RUN cargo chef cook --release --recipe-path recipe.json
 
 # Copy source code and build the actual binary
 COPY . .
-RUN cargo build --release --bin arb-bot
+RUN cargo build --release --bin defi_arbitrageur
 
 # --- Stage 4: Create minimal runtime image ---
 FROM debian:bookworm-slim AS runtime
@@ -34,7 +34,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Copy compiled binary
-COPY --from=builder /app/target/release/arb-bot /usr/local/bin/arb-bot
+COPY --from=builder /app/target/release/defi_arbitrageur /usr/local/bin/arb-bot
 
 # Create non-root user for safety
 RUN useradd -m arbuser

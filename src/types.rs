@@ -38,7 +38,7 @@ pub struct Token {
 pub enum DexType {
     V2,
     V3,
-    Balancer
+    QuickSwap
 }
 #[derive(Debug, Clone,Serialize, Deserialize)]
 pub struct BalancerPoolInfo {

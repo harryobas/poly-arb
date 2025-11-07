@@ -2,7 +2,16 @@ version: "3.9"
 
 services:
   arb-bot:
-    image: harryobas/arb-bot:latest
-    restart: always
-    env_file:
-      - .env
+    image: ${DOCKER_IMAGE}
+    container_name: arb-bot
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    environment:
+      RPC_URL: ${RPC_URL}
+    secrets:
+      - private_key
+
+secrets:
+  private_key:
+    external: true

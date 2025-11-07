@@ -5,6 +5,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    environment:
-      - RUST_LOG=debug
-      
+
+    container_name: arb-bot
+    restart: unless-stopped
+    
+    # Optional if you want to run interactively for debugging
+    stdin_open: true
+    tty: true
+
+  

@@ -11,20 +11,24 @@ mod dex_pool_resolver;
 
 use crate::{
     arb_worker::ArbWorker, 
-     block_watcher::BlockWatcher, 
+    block_watcher::BlockWatcher, 
+    constants::PROVIDER,
     types::PriceTracker
 };
 
 use tokio::sync::broadcast;
 use std::sync::Arc;
-use ethers::{types::H256, providers::{Provider, Ws}};
+use ethers::types::H256;
+
+use dotenv::dotenv;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
+    dotenv().ok();
 
     // Shared state
-    let provider = Arc::new(Provider::<Ws>::connect("wss://polygon-zkevm.drpc.org").await?);
+    let provider = PROVIDER.clone();
     let tracker = Arc::new(PriceTracker::new());
 
     // 1 Create broadcast channel for block hashes

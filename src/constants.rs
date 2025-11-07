@@ -1,12 +1,21 @@
 use std::collections::HashMap;
-use ethers::types::Address;
+use ethers::{
+    signers::{LocalWallet, Signer}, 
+    types::Address,
+    providers::{Provider, Ws},
+    middleware::SignerMiddleware
+};
 use dashmap::DashMap;
 
+use crate::helpers::{load_private_key, load_rpc_url};
+
 use once_cell::sync::Lazy;
+use std::sync::Arc;
 
 pub const WETH: &str = "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619";
 pub const WBTC: &str = "0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6";
 pub const USDC: &str = "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359";
+
 pub const USDT: &str = "0xc2132D05D31c914a87C6611C10748AEb04B58e8F";                    
 pub const DAI: &str = "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063";
 pub const MATICX: &str = "0xfa68FB4628DFF1028CFEc22b4162FCcd0d45efb6";
@@ -28,6 +37,8 @@ pub const SUSHISWAPV3_ROUTER: &str = "";
 
 
 pub const FLASH_ARBITRAGEUR: &str = "";
+
+pub const CHAIN_ID: u64 = 137;
 
 pub static  FACTORY_ROUTER_MAP: Lazy<HashMap<Address, Address>> = Lazy::new(|| {
     let mut map = HashMap::new();
@@ -58,4 +69,24 @@ pub static  FACTORY_ROUTER_MAP: Lazy<HashMap<Address, Address>> = Lazy::new(|| {
 
 pub static TOKEN_SYMBOL_CACHE: Lazy<DashMap<Address, String>> = Lazy::new(|| {DashMap::new()});
 
-pub static BALANCERPOOL_TOKENS_MAP: Lazy<HashMap<Address, Vec<Address>>> = Lazy::new(|| HashMap::new());
+pub static PRIVATE_KEY: Lazy<String> = Lazy::new(|| {
+    load_private_key()
+});
+
+pub static RPC_URL: Lazy<String> = Lazy::new(|| {
+    load_rpc_url()
+});
+
+pub static WALLET: Lazy<LocalWallet> = Lazy::new(|| {
+    PRIVATE_KEY.parse::<LocalWallet>().unwrap().with_chain_id(CHAIN_ID)
+});
+
+pub static PROVIDER: Lazy<Arc<SignerMiddleware<Provider<Ws>, LocalWallet>>> = Lazy::new(|| {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let ws = Ws::connect(&*RPC_URL).await.unwrap();
+        let provider = Provider::new(ws);
+        let signer = WALLET.clone();
+        Arc::new(SignerMiddleware::new(provider, signer))
+    })
+});
