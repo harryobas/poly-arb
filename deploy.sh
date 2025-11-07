@@ -2,7 +2,6 @@
 set -euo pipefail
 
 echo "🚀 Starting deployment on Hetzner VPS..."
-#cd /root/arb-bot
 
 # --- Validate required environment variables ---
 if [[ -z "${PRIVATE_KEY:-}" ]]; then
@@ -15,32 +14,33 @@ if [[ -z "${DOCKER_IMAGE:-}" ]]; then
     exit 1
 fi
 
-# --- Secure Docker secret creation ---
-echo "🔐 Updating Docker secret 'private_key'..."
-TEMP_KEY_FILE=$(mktemp)
-echo "$PRIVATE_KEY" > "$TEMP_KEY_FILE"
-
-if docker secret inspect private_key >/dev/null 2>&1; then
-    docker secret rm private_key || echo "⚠️  Could not remove old secret, continuing..."
+# Add RPC_URL validation if your bot requires it
+if [[ -z "${RPC_URL:-}" ]]; then
+    echo "❌ RPC_URL environment variable is not set"
+    exit 1
 fi
 
-docker secret create private_key "$TEMP_KEY_FILE"
-shred -u "$TEMP_KEY_FILE"
-echo "✅ Docker secret updated successfully"
+echo "✅ All required environment variables are set"
 
 # --- Deploy new container ---
 echo "🐳 Pulling latest image: $DOCKER_IMAGE"
-docker pull "$DOCKER_IMAGE"
+if ! docker pull "$DOCKER_IMAGE"; then
+    echo "❌ Failed to pull Docker image"
+    exit 1
+fi
 
 echo "🧹 Stopping old container..."
 docker compose down --remove-orphans --timeout 30 || true
 
 echo "🚀 Starting updated container..."
-docker compose up -d
+if ! docker compose up -d; then
+    echo "❌ Failed to start containers with docker compose"
+    exit 1
+fi
 
 # --- Health check ---
 echo "⏳ Waiting for container to start..."
-sleep 5
+sleep 10  # Increased sleep for more reliable startup
 
 CONTAINER_NAME=$(docker compose ps --services | head -1)
 
@@ -50,7 +50,8 @@ if [[ -z "$CONTAINER_NAME" ]]; then
     exit 1
 fi
 
-if docker compose ps | grep -q "Up"; then
+# More specific health check
+if docker compose ps "$CONTAINER_NAME" | grep -q "Up"; then
     echo "✅ Container started successfully!"
     echo "📊 Container status:"
     docker compose ps
@@ -58,9 +59,14 @@ if docker compose ps | grep -q "Up"; then
     echo "📋 Recent logs:"
     docker compose logs --tail=20
     
-    # Optional: Interactive attachment (commented out for automation)
-    # echo "🎛️  To attach to TUI: docker attach $CONTAINER_NAME"
-    # echo "📤 To detach safely: Ctrl+P, Ctrl+Q"
+    # Verify environment variables are set in container (optional)
+    echo "🔍 Verifying environment variables in container..."
+    if docker exec "$CONTAINER_NAME" printenv RPC_URL >/dev/null 2>&1; then
+        echo "✅ RPC_URL is set in container"
+    else
+        echo "⚠️  RPC_URL not found in container environment"
+    fi
+    
 else
     echo "❌ Container failed to start. Check logs:"
     docker compose logs

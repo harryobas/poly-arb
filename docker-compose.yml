@@ -9,9 +9,7 @@ services:
     tty: true
     environment:
       RPC_URL: ${RPC_URL}
-    secrets:
-      - private_key
+      PRIVATE_KEY: ${PRIVATE_KEY}
+    
 
-secrets:
-  private_key:
-    external: true
+
